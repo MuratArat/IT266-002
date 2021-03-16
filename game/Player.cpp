@@ -67,6 +67,7 @@ const int SPECTATE_RAISE = 25;
 
 const int	HEALTH_PULSE		= 1000;			// Regen rate and heal leak rate (for health > 100)
 const int	ARMOR_PULSE			= 1000;			// armor ticking down due to being higher than maxarmor
+const int	MANA_PULSE			= 1000;			// mana ticking up due to being lower than maxmana
 const int	AMMO_REGEN_PULSE	= 1000;			// ammo regen in Arena CTF
 const int	POWERUP_BLINKS		= 5;			// Number of times the powerup wear off sound plays
 const int	POWERUP_BLINK_TIME	= 1000;			// Time between powerup wear off sounds
@@ -107,6 +108,7 @@ const idEventDef EV_Player_GetAmmoData( "getAmmoData", "s", 'v');
 const idEventDef EV_Player_RefillAmmo( "refillAmmo" );
 const idEventDef EV_Player_SetExtraProjPassEntity( "setExtraProjPassEntity", "E" );
 const idEventDef EV_Player_SetArmor( "setArmor", "f" );
+const idEventDef EV_Player_SetMana("setMana", "f");
 const idEventDef EV_Player_DamageEffect( "damageEffect", "sE" );
 const idEventDef EV_Player_AllowFallDamage( "allowFallDamage", "d" );
 
@@ -162,6 +164,8 @@ CLASS_DECLARATION( idActor, idPlayer )
 	EVENT( AI_SetHealth,					idPlayer::Event_SetHealth )
 //MCG: setArmor
 	EVENT( EV_Player_SetArmor,				idPlayer::Event_SetArmor )
+//MCG: setMana
+	EVENT(EV_Player_SetMana,				idPlayer::Event_SetMana	)
 // RAVEN END;
 	EVENT( EV_Player_SetExtraProjPassEntity,idPlayer::Event_SetExtraProjPassEntity )
 //MCG: direct damage
@@ -204,7 +208,9 @@ void idInventory::Clear( void ) {
 	carryOverWeapons	= 0;
 	powerups			= 0;
 	armor				= 0;
+	mana				= 0;
 	maxarmor			= 0;
+	maxmana				= 0;
 	secretAreasDiscovered = 0;
 
 	memset( ammo, 0, sizeof( ammo ) );
@@ -335,10 +341,12 @@ void idInventory::RestoreInventory( idPlayer *owner, const idDict &dict ) {
 	//We might not need to clear it out.
 	//Clear();
 
-	// health/armor
+	// health/armor/mana
 	maxHealth		= dict.GetInt( "maxhealth", "100" );
 	armor			= dict.GetInt( "armor", "50" );
 	maxarmor		= dict.GetInt( "maxarmor", "100" );
+	mana			= dict.GetInt("mana", "50");
+	maxmana			= dict.GetInt("maxmana", "100");
 
 	// ammo
 	for( i = 0; i < MAX_AMMOTYPES; i++ ) {
@@ -403,7 +411,9 @@ void idInventory::Save( idSaveGame *savefile ) const {
 	savefile->WriteInt( weapons );
 	savefile->WriteInt( powerups );
 	savefile->WriteInt( armor );
+	savefile->WriteInt(mana);
 	savefile->WriteInt( maxarmor );
+	savefile->WriteInt(maxmana);
 
 	for( i = 0; i < MAX_AMMO; i++ ) {
 		savefile->WriteInt( ammo[ i ] );
@@ -484,6 +494,8 @@ void idInventory::Restore( idRestoreGame *savefile ) {
 	savefile->ReadInt( powerups );
 	savefile->ReadInt( armor );
 	savefile->ReadInt( maxarmor );
+	savefile->ReadInt(mana);
+	savefile->ReadInt(maxmana);
 
 	for( i = 0; i < MAX_AMMO; i++ ) {
 		savefile->ReadInt( ammo[ i ] );
@@ -2130,6 +2142,7 @@ void idPlayer::Save( idSaveGame *savefile ) const {
  	savefile->WriteBool( doingDeathSkin );
  	savefile->WriteInt( nextHealthPulse );
  	savefile->WriteInt( nextArmorPulse );
+	savefile->WriteInt( nextManaPulse );
  	savefile->WriteBool( hiddenWeapon );
 
 //	savefile->WriteInt( spectator );						// Don't save MP stuff
@@ -2403,6 +2416,7 @@ void idPlayer::Restore( idRestoreGame *savefile ) {
  	savefile->ReadBool( doingDeathSkin );
  	savefile->ReadInt( nextHealthPulse );
  	savefile->ReadInt( nextArmorPulse );
+	savefile->ReadInt( nextManaPulse );
  	savefile->ReadBool( hiddenWeapon );
 
 	assert( !spectator );								// Don't save MP stuff
@@ -2781,6 +2795,7 @@ Initializes all non-persistant parts of playerState
 when called here with spectating set to true, just place yourself and init
 ============
 */
+
 void idPlayer::SpawnToPoint( const idVec3 &spawn_origin, const idAngles &spawn_angles ) {
 	idVec3 spec_origin;
 
@@ -2808,16 +2823,20 @@ void idPlayer::SpawnToPoint( const idVec3 &spawn_origin, const idAngles &spawn_a
 			combatModel->Unlink( );
 		}
 	}
-
+	
 	// Any health over max health will tick down
 	if ( health > inventory.maxHealth ) {
 		nextHealthPulse = gameLocal.time + HEALTH_PULSE;
 	}
 	
-	if ( inventory.armor > inventory.maxarmor ) {
+	if ( inventory.armor < inventory.maxarmor ) {
 		nextArmorPulse = gameLocal.time + ARMOR_PULSE;
-	}		
-
+	}	
+	
+	if (inventory.mana < inventory.maxmana) {
+		nextManaPulse = gameLocal.time + MANA_PULSE;
+	}
+	
 	fl.noknockback = false;
 	// stop any ragdolls being used
 	StopRagdoll();
@@ -3406,6 +3425,13 @@ void idPlayer::UpdateHudStats( idUserInterface *_hud ) {
 		_hud->SetStateInt ( "player_armor", inventory.armor );
 		_hud->SetStateFloat	( "player_armorpct", idMath::ClampFloat ( 0.0f, 1.0f, (float)inventory.armor / (float)inventory.maxarmor ) );
 		_hud->HandleNamedEvent ( "updateArmor" );
+	}
+	temp = _hud->State().GetInt("player_mana", "-1");
+	if (temp != inventory.mana) {
+		_hud->SetStateInt("player_manaDelta", temp == -1 ? 0 : (temp - inventory.mana));
+		_hud->SetStateInt("player_mana", inventory.mana < -100 ? -100 : inventory.mana);
+		_hud->SetStateFloat("player_manahpct", idMath::ClampFloat(0.0f, 1.0f, (float)inventory.mana / (float)inventory.maxmana));
+		_hud->HandleNamedEvent("updateMana");
 	}
 	
 	// Boss bar
@@ -4069,6 +4095,7 @@ bool idPlayer::Give( const char *statname, const char *value, bool dropped ) {
 
 	int boundaryHealth = inventory.maxHealth;
 	int boundaryArmor = inventory.maxarmor;
+	int boundaryMana = inventory.maxmana;
 	if( PowerUpActive( POWERUP_GUARD ) ) {
 		boundaryHealth = inventory.maxHealth / 2;
 		boundaryArmor = inventory.maxarmor / 2;
@@ -4112,11 +4139,38 @@ bool idPlayer::Give( const char *statname, const char *value, bool dropped ) {
 		amount = atoi( value );
 
 		inventory.armor += amount;
-		if ( inventory.armor > boundaryArmor ) {
+		if ( inventory.armor < boundaryArmor ) {
 			 inventory.armor = boundaryArmor;
 		}
 		nextArmorPulse = gameLocal.time + ARMOR_PULSE;
-	} else if ( !idStr::Icmp( statname, "air" ) ) {
+	}
+	else if (!idStr::Icmp(statname, "mana")) {
+		if (inventory.mana >= boundaryMana) {
+			return false;
+		}
+		amount = atoi(value);
+		if (amount) {
+			inventory.mana += amount;
+			if (inventory.mana > boundaryMana) {
+				inventory.mana = boundaryMana;
+			}
+		}
+	}
+	else if (!idStr::Icmp(statname, "bonusMana")) {
+		// allow mana over max mana
+		if (inventory.mana >= boundaryMana * 2) {
+			return false;
+		}
+		amount = atoi(value);
+		if (amount) {
+			inventory.mana += amount;
+			if (inventory.mana > boundaryMana * 2) {
+				inventory.mana = boundaryMana * 2;
+			}
+		}
+		nextManaPulse = gameLocal.time + MANA_PULSE;
+	}
+	else if (!idStr::Icmp(statname, "air")) {
 		if ( airTics >= pm_airTics.GetInteger() ) {
 			return false;
 		}
@@ -4957,10 +5011,17 @@ void idPlayer::UpdatePowerUps( void ) {
 
 	// Tick armor down if greater than max armor
 	if ( !gameLocal.isClient && gameLocal.time > nextArmorPulse ) {
-		if ( inventory.armor > inventory.maxarmor ) { 
+		if ( inventory.armor < inventory.maxarmor ) { 
 			nextArmorPulse += ARMOR_PULSE;
-			inventory.armor--;
+			inventory.armor++;
 		}		
+	}
+	// Tick mana up if less than max mana
+	if (!gameLocal.isClient && gameLocal.time > nextManaPulse) {
+		if (inventory.mana < inventory.maxmana) {
+			nextManaPulse += MANA_PULSE;
+			inventory.mana++;
+		}
 	}
 		
 	// Assign the powerup skin as long as we are alive
@@ -11191,7 +11252,14 @@ idPlayer::Event_SetArmor
 void idPlayer::Event_SetArmor( float newArmor ) {
 	inventory.armor = idMath::ClampInt( 0 , inventory.maxarmor, newArmor );
 }
-
+/*
+=============
+idPlayer::Event_SetMana
+=============
+*/
+void idPlayer::Event_SetMana(float newMana) {
+	inventory.mana = idMath::ClampInt(1, inventory.maxmana, newMana);
+}
 /*
 =============
 idPlayer::Event_SetExtraProjPassEntity
