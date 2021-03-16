@@ -1110,7 +1110,7 @@ void idPhysics_Player::CheckGround( bool checkStuck ) {
 	}
 
 	// if the player didn't have ground contacts the previous frame
-	if ( !hadGroundContacts ) {
+	if (!hadGroundContacts) {
 		// don't do landing time if we were just going down a slope
 		if ( (current.velocity * -gravityNormal) < -200.0f ) {
 			// don't allow another jump for a little while

@@ -203,6 +203,8 @@ public:
 	int						powerups;
 	int						armor;
 	int						maxarmor;
+	int						mana;
+	int						maxmana;
 	int						ammo[ MAX_AMMO ];
 	int						clip[ MAX_WEAPONS ];
 	int						powerupEndTime[ POWERUP_MAX ];
@@ -327,6 +329,11 @@ public:
 		bool		hearingLoss		:1;
 		bool		objectiveFailed	:1;
 		bool		noFallingDamage :1;
+		bool		HP_SPELL : 1;
+		bool		LIGHTNING_SPELL : 1;
+		bool		SPEED_SPELL : 1;
+		bool		JUMP_SPELL : 1;
+		bool		SPAWN_SPELL : 1;
 	} pfl;
 		
 	// inventory
@@ -354,6 +361,7 @@ public:
 	int						nextHealthPulse;	// time when health will tick down
 	int						nextAmmoRegenPulse[ MAX_AMMO ];	// time when ammo will regenerate
 	int						nextArmorPulse;		// time when armor will tick down
+	int						nextManaPulse;		// time when mana will tick up
 	bool					hiddenWeapon;		// if the weapon is hidden ( in noWeapons maps )
 
 	// mp stuff
@@ -1093,6 +1101,7 @@ private:
 	// mekberg:	added sethealth
 	void					Event_SetHealth					( float newHealth );
 	void					Event_SetArmor					( float newArmor );
+	void					Event_SetMana					(float newMana);
 
 	void					Event_SetExtraProjPassEntity( idEntity* _extraProjPassEntity );
 	void					Event_DamageEffect			( const char *damageDefName, idEntity* _damageFromEnt  );
