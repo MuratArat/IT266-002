@@ -5010,7 +5010,7 @@ void idPlayer::UpdatePowerUps( void ) {
 	}
 
 	// Tick armor down if greater than max armor
-	if ( !gameLocal.isClient && gameLocal.time > nextArmorPulse ) {
+	if ( !gameLocal.isClient) {
 		if ( inventory.armor < inventory.maxarmor ) { 
 			nextArmorPulse += ARMOR_PULSE;
 			inventory.armor++;
@@ -8536,81 +8536,85 @@ void idPlayer::PerformImpulse( int impulse ) {
 #endif
 //RAVEN END
 
-	switch( impulse ) {
-		case IMPULSE_13: {
-			Reload();
-			break;
+	switch (impulse) {
+	case IMPULSE_13: {
+		Reload();
+		break;
+	}
+	case IMPULSE_14: {
+		NextWeapon();
+		if (gameLocal.isServer && spectating && gameLocal.gameType == GAME_TOURNEY) {
+			((rvTourneyGameState*)gameLocal.mpGame.GetGameState())->SpectateCycleNext(this);
 		}
-		case IMPULSE_14: {
-			NextWeapon();
-			if( gameLocal.isServer && spectating && gameLocal.gameType == GAME_TOURNEY ) {	
-				((rvTourneyGameState*)gameLocal.mpGame.GetGameState())->SpectateCycleNext( this );
-			}
-			break;
+		break;
+	}
+	case IMPULSE_15: {
+		PrevWeapon();
+		if (gameLocal.isServer && spectating && gameLocal.gameType == GAME_TOURNEY) {
+			((rvTourneyGameState*)gameLocal.mpGame.GetGameState())->SpectateCyclePrev(this);
 		}
-		case IMPULSE_15: {
-			PrevWeapon();
-			if( gameLocal.isServer && spectating && gameLocal.gameType == GAME_TOURNEY ) {	
-				((rvTourneyGameState*)gameLocal.mpGame.GetGameState())->SpectateCyclePrev( this );
-			}
-			break;
+		break;
+	}
+	case IMPULSE_17: {
+		if (gameLocal.isClient || entityNumber == gameLocal.localClientNum) {
+			gameLocal.mpGame.ToggleReady();
 		}
-		case IMPULSE_17: {
- 			if ( gameLocal.isClient || entityNumber == gameLocal.localClientNum ) {
- 				gameLocal.mpGame.ToggleReady( );
-			}
-			break;
-		}
-		case IMPULSE_18: {
-			centerView.Init(gameLocal.time, 200, viewAngles.pitch, 0);
-			break;
-		}
-		case IMPULSE_19: {
-/*		
-			// when we're not in single player, IMPULSE_19 is used for showScores
-			// otherwise it does IMPULSE_12 (PDA)
-			if ( !gameLocal.isMultiplayer ) {
-				if ( !objectiveSystemOpen ) {
+		break;
+	}
+	case IMPULSE_18: {
+		centerView.Init(gameLocal.time, 200, viewAngles.pitch, 0);
+		break;
+	}
+	case IMPULSE_19: {
+		/*
+					// when we're not in single player, IMPULSE_19 is used for showScores
+					// otherwise it does IMPULSE_12 (PDA)
+					if ( !gameLocal.isMultiplayer ) {
+					if ( !objectiveSystemOpen ) {
 					if ( weapon ) {
-						weapon->Hide ();
+					weapon->Hide ();
 					}
-				}
-				ToggleMap();
-			}
-*/
-			break;
-		}
-		case IMPULSE_20: {
- 			if ( gameLocal.isClient || entityNumber == gameLocal.localClientNum ) {
- 				gameLocal.mpGame.ToggleTeam( );
-			}
-			break;
-		}
-		case IMPULSE_21: {
-			if( gameLocal.isServer && gameLocal.gameType == GAME_TOURNEY ) {
-				// only allow a client to join the waiting arena if they are not currently assigned to an arena
-
-				// removed waiting arena functionality for now
-				/*rvTourneyArena& arena = ((rvTourneyGameState*)gameLocal.mpGame.GetGameState())->GetArena( GetArena() );
-
-				if( this != arena.GetPlayers()[ 0 ] && this != arena.GetPlayers()[ 1 ] ) {
-					if( instance == MAX_ARENAS && !spectating ) {
-						ServerSpectate( true );
-						JoinInstance( ((rvTourneyGameState*)gameLocal.mpGame.GetGameState())->GetNextActiveArena( 0 ) );
-					} else if( spectating ) {
-						JoinInstance( MAX_ARENAS );
-						ServerSpectate( false );
 					}
-				}*/
-			}
-			break;
+					ToggleMap();
+					}
+					*/
+		break;
+	}
+	case IMPULSE_20: {
+		if (gameLocal.isClient || entityNumber == gameLocal.localClientNum) {
+			gameLocal.mpGame.ToggleTeam();
 		}
-		case IMPULSE_22: {
- 			if ( gameLocal.isClient || entityNumber == gameLocal.localClientNum ) {
- 				gameLocal.mpGame.ToggleSpectate( );
-   			}
-   			break;
-   		}
+		break;
+	}
+	case IMPULSE_21: {
+		if (gameLocal.isServer && gameLocal.gameType == GAME_TOURNEY) {
+			// only allow a client to join the waiting arena if they are not currently assigned to an arena
+
+			// removed waiting arena functionality for now
+			/*rvTourneyArena& arena = ((rvTourneyGameState*)gameLocal.mpGame.GetGameState())->GetArena( GetArena() );
+
+			if( this != arena.GetPlayers()[ 0 ] && this != arena.GetPlayers()[ 1 ] ) {
+			if( instance == MAX_ARENAS && !spectating ) {
+			ServerSpectate( true );
+			JoinInstance( ((rvTourneyGameState*)gameLocal.mpGame.GetGameState())->GetNextActiveArena( 0 ) );
+			} else if( spectating ) {
+			JoinInstance( MAX_ARENAS );
+			ServerSpectate( false );
+			}
+			}*/
+		}
+		break;
+	}
+	case IMPULSE_22: {
+		if (gameLocal.isClient || entityNumber == gameLocal.localClientNum) {
+			gameLocal.mpGame.ToggleSpectate();
+		}
+		break;
+	}
+	case IMPULSE_23:{
+			HealSpell();
+			break;
+			 }
 				
 		case IMPULSE_28: {
  			if ( gameLocal.isClient || entityNumber == gameLocal.localClientNum ) {
@@ -8659,6 +8663,7 @@ void idPlayer::PerformImpulse( int impulse ) {
 		case IMPULSE_125:	AttemptToBuyItem( "damage_boost" );					break;
 		case IMPULSE_126:	break; // Unused
 		case IMPULSE_127:	break; // Unused
+
 // RITUAL END
 
 		case IMPULSE_50: {
@@ -8671,6 +8676,7 @@ void idPlayer::PerformImpulse( int impulse ) {
  			break;
  		}
 	} 
+
 
 //RAVEN BEGIN
 //asalmon: route d-pad input to the active gui.
@@ -8695,6 +8701,16 @@ void idPlayer::PerformImpulse( int impulse ) {
 //RAVEN END
 }
    
+void idPlayer::HealSpell(void) {
+	if (inventory.mana< 50){
+		return;
+	}
+	inventory.mana -= 50;
+	if (health >= 75)
+		health = 100;
+	else
+		health += 25;
+}
 /*
 ==============
 idPlayer::HandleESC

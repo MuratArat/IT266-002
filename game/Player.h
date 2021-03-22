@@ -614,6 +614,7 @@ public:
 	void					RemoveWeapon				( const char *weap );
 	void					Flashlight					( bool on );
 	void					ToggleFlashlight			( void );
+	void					HealSpell					( void );
  	bool					CanShowWeaponViewmodel		( void ) const;
 
 	virtual bool			HandleSingleGuiCommand( idEntity *entityGui, idLexer *src );
